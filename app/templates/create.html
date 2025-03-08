@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Criar Nova Nota - Notas com IA{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Criar Nova Nota</h1>
+        <div class="card">
+            <div class="card-body">
+                <form id="create-note-form">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Título</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Conteúdo</label>
+                        <textarea class="form-control" id="content" name="content" rows="6" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tags" class="form-label">Tags (separadas por vírgula)</label>
+                        <input type="text" class="form-control" id="tags" name="tags" placeholder="ex: estudo, mongodb, ia">
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-primary">Salvar Nota</button>
+                        <div>
+                            <button type="button" id="btn-ai-expand" class="btn btn-outline-success">Expandir com IA</button>
+                            <button type="button" id="btn-ai-summarize" class="btn btn-outline-info">Resumir com IA</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para processamento de IA -->
+<div class="modal fade" id="aiModal" tabindex="-1" aria-labelledby="aiModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aiModalLabel">Processamento com IA</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center my-4" id="ai-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Processando...</span>
+                    </div>
+                    <p>Processando seu texto com IA...</p>
+                </div>
+                <div id="ai-result" style="display: none;">
+                    <h6>Resultado:</h6>
+                    <div class="border p-3 bg-light" id="ai-result-text"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" id="btn-use-result">Usar este resultado</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('create-note-form');
+        const expandBtn = document.getElementById('btn-ai-expand');
+        const summarizeBtn = document.getElementById('btn-ai-summarize');
+        const useResultBtn = document.getElementById('btn-use-result');
+        
+        let aiResult = '';
+        let aiAction = '';
+        
+        // Modal de Bootstrap
+        const aiModal = new bootstrap.Modal(document.getElementById('aiModal'));
+        
+        // Função para enviar a nota
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('title').value;
+            const content = document.getElementById('content').value;
+            const tagsInput = document.getElementById('tags').value;
+            
+            // Processa as tags
+            const tags = tagsInput ? tagsInput.split(',').map(tag => tag.trim()) : [];
+            
+            try {
+                const response = await fetch('/api/notes/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title,
+                        content,
+                        tags
+                    })
+                });
+                
+                if (response.ok) {
+                    // Redireciona para a página inicial após sucesso
+                    window.location.href = '/';
+                } else {
+                    const error = await response.json();
+                    alert(`Erro ao criar nota: ${error.detail || 'Erro desconhecido'}`);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao criar nota. Tente novamente mais tarde.');
+            }
+        });
+        
+        // Função para processar texto com IA
+        async function processWithAI(endpoint) {
+            const content = document.getElementById('content').value;
+            
+            if (!content) {
+                alert('Por favor, escreva algum conteúdo antes de usar os recursos de IA.');
+                return;
+            }
+            
+            // Mostra o modal
+            aiModal.show();
+            document.getElementById('ai-loading').style.display = 'block';
+            document.getElementById('ai-result').style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/ai/${endpoint}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: content,
+                        max_tokens: endpoint === 'expand' ? 500 : 200
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    aiResult = data.result;
+                    
+                    // Exibe o resultado
+                    document.getElementById('ai-loading').style.display = 'none';
+                    document.getElementById('ai-result').style.display = 'block';
+                    document.getElementById('ai-result-text').textContent = aiResult;
+                } else {
+                    const error = await response.json();
+                    alert(`Erro ao processar com IA: ${error.detail || 'Erro desconhecido'}`);
+                    aiModal.hide();
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao processar com IA. Tente novamente mais tarde.');
+                aiModal.hide();
+            }
+        }
+        
+        // Botão para expandir texto
+        expandBtn.addEventListener('click', function() {
+            aiAction = 'expand';
+            processWithAI('expand');
+        });
+        
+        // Botão para resumir texto
+        summarizeBtn.addEventListener('click', function() {
+            aiAction = 'summarize';
+            processWithAI('summarize');
+        });
+        
+        // Botão para usar o resultado da IA
+        useResultBtn.addEventListener('click', function() {
+            document.getElementById('content').value = aiResult;
+            aiModal.hide();
+        });
+    });
+</script>
+{% endblock %} 

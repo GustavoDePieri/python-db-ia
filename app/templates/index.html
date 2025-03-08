@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Início - Notas com IA{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h1 class="card-title">Bem-vindo ao Aplicativo de Notas com IA</h1>
+                <p class="card-text">
+                    Este é um aplicativo didático que demonstra a integração entre:
+                </p>
+                <ul>
+                    <li>MongoDB para armazenamento de dados</li>
+                    <li>Pesquisa vetorial para busca semântica</li>
+                    <li>Integração com APIs de IA (OpenAI)</li>
+                    <li>FastAPI para backend</li>
+                </ul>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                    <a href="/create" class="btn btn-primary me-md-2">Criar Nova Nota</a>
+                    <a href="/search" class="btn btn-outline-primary">Pesquisar Notas</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="notes-container">
+    <div class="col-md-12">
+        <h2>Suas Notas</h2>
+        <div class="text-center my-5" id="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+        <div id="notes-list" class="row"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Função para carregar as notas
+    async function loadNotes() {
+        try {
+            const response = await fetch('/api/notes/');
+            const notes = await response.json();
+            
+            const notesContainer = document.getElementById('notes-list');
+            document.getElementById('loading').style.display = 'none';
+            
+            if (notes.length === 0) {
+                notesContainer.innerHTML = '<div class="col-12"><div class="alert alert-info">Nenhuma nota encontrada. Crie sua primeira nota!</div></div>';
+                return;
+            }
+            
+            notesContainer.innerHTML = '';
+            
+            notes.forEach(note => {
+                const createdAt = new Date(note.created_at).toLocaleDateString('pt-BR');
+                const noteCard = document.createElement('div');
+                noteCard.className = 'col-md-4 mb-4';
+                noteCard.innerHTML = `
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">${note.title}</h5>
+                            <p class="card-text">${note.content.substring(0, 100)}${note.content.length > 100 ? '...' : ''}</p>
+                            <div class="d-flex">
+                                ${note.tags.map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div class="card-footer text-muted d-flex justify-content-between">
+                            <small>Criado em: ${createdAt}</small>
+                            <div>
+                                <button class="btn btn-sm btn-danger delete-note" data-id="${note.id}">Excluir</button>
+                                <a href="/note/${note.id}" class="btn btn-sm btn-primary">Ver</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                notesContainer.appendChild(noteCard);
+            });
+            
+            // Adiciona eventos para os botões de exclusão
+            document.querySelectorAll('.delete-note').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    if (confirm('Tem certeza que deseja excluir esta nota?')) {
+                        const noteId = e.target.getAttribute('data-id');
+                        try {
+                            const response = await fetch(`/api/notes/${noteId}`, {
+                                method: 'DELETE'
+                            });
+                            
+                            if (response.ok) {
+                                // Recarrega as notas após exclusão
+                                loadNotes();
+                            } else {
+                                alert('Erro ao excluir a nota.');
+                            }
+                        } catch (error) {
+                            console.error('Erro:', error);
+                            alert('Erro ao excluir a nota.');
+                        }
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Erro ao carregar notas:', error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('notes-list').innerHTML = '<div class="col-12"><div class="alert alert-danger">Erro ao carregar notas. Tente novamente mais tarde.</div></div>';
+        }
+    }
+    
+    // Carrega as notas quando a página é carregada
+    document.addEventListener('DOMContentLoaded', loadNotes);
+</script>
+{% endblock %} 

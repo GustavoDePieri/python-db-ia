@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Pesquisa Semântica - Notas com IA{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Pesquisa Semântica</h1>
+        <div class="card mb-4">
+            <div class="card-body">
+                <p class="card-text">
+                    A pesquisa semântica utiliza embeddings vetoriais para encontrar notas com significado similar à sua consulta,
+                    mesmo que não contenham exatamente as mesmas palavras.
+                </p>
+                <form id="search-form" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="search-query" placeholder="Digite sua consulta..." required>
+                        <button class="btn btn-primary" type="submit">Pesquisar</button>
+                    </div>
+                    <div class="form-text">
+                        Exemplo: "Técnicas de aprendizado de máquina" encontrará notas sobre IA, mesmo que não contenham essas palavras exatas.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="text-center my-5" id="loading" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Pesquisando...</span>
+            </div>
+            <p>Realizando pesquisa semântica...</p>
+        </div>
+        
+        <div id="search-results">
+            <div class="alert alert-info">
+                Digite uma consulta acima para pesquisar suas notas.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchForm = document.getElementById('search-form');
+        const searchQuery = document.getElementById('search-query');
+        const searchResults = document.getElementById('search-results');
+        const loading = document.getElementById('loading');
+        
+        searchForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const query = searchQuery.value.trim();
+            if (!query) return;
+            
+            // Mostra o indicador de carregamento
+            loading.style.display = 'block';
+            searchResults.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/search/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        limit: 5
+                    })
+                });
+                
+                // Esconde o indicador de carregamento
+                loading.style.display = 'none';
+                
+                if (response.ok) {
+                    const results = await response.json();
+                    
+                    if (results.length === 0) {
+                        searchResults.innerHTML = `
+                            <div class="alert alert-warning">
+                                Nenhum resultado encontrado para "${query}".
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Exibe os resultados
+                    let resultsHTML = `
+                        <h3>Resultados para "${query}"</h3>
+                        <div class="list-group">
+                    `;
+                    
+                    results.forEach((result, index) => {
+                        const score = result.score ? Math.round(result.score * 100) / 100 : 'N/A';
+                        resultsHTML += `
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">${result.title}</h5>
+                                    <small>Relevância: ${score}</small>
+                                </div>
+                                <p class="mb-1">${result.content.substring(0, 200)}${result.content.length > 200 ? '...' : ''}</p>
+                                <div class="d-flex justify-content-end">
+                                    <a href="/note/${result.id}" class="btn btn-sm btn-primary">Ver nota completa</a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    resultsHTML += '</div>';
+                    searchResults.innerHTML = resultsHTML;
+                    
+                } else {
+                    const error = await response.json();
+                    searchResults.innerHTML = `
+                        <div class="alert alert-danger">
+                            Erro na pesquisa: ${error.detail || 'Erro desconhecido'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                loading.style.display = 'none';
+                searchResults.innerHTML = `
+                    <div class="alert alert-danger">
+                        Erro ao realizar a pesquisa. Tente novamente mais tarde.
+                    </div>
+                `;
+            }
+        });
+    });
+</script>
+{% endblock %} 
