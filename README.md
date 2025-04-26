@@ -1,6 +1,6 @@
 # Aplicação de Notas com IA e MongoDB Vector Search
 
-Este projeto é uma aplicação didática que demonstra:
+Este projeto é uma aplicação didática que envolve:
 - Integração com banco de dados MongoDB (incluindo busca vetorial)
 - Integração com APIs de IA (OpenAI)
 - Roteamento de páginas com FastAPI
